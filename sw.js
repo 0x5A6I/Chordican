@@ -2,18 +2,25 @@ const CACHE_NAME = 'chordican-v1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './manifest.webmanifest',
-  'https://cdn.tailwindcss.com',
-  'https://unpkg.com/lucide@latest',
-  'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js',
-  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap'
+  './manifest.webmanifest'
 ];
 
-// Install: pre-cache static assets
+// Install: resilient caching (avoids failure if CDN or fonts block cache.addAll)
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Cache local critical shell assets first
+      await cache.addAll(ASSETS_TO_CACHE);
+
+      // Best-effort cache for CDN dependencies without failing install
+      const optionalCdnAssets = [
+        'https://cdn.tailwindcss.com',
+        'https://unpkg.com/lucide@latest',
+        'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js'
+      ];
+      await Promise.allSettled(
+        optionalCdnAssets.map(url => cache.add(new Request(url, { mode: 'no-cors' })))
+      );
     })
   );
   self.skipWaiting();
