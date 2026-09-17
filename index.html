@@ -215,7 +215,7 @@
       <!-- MIDI Status / Request Button -->
       <button id="midiConnectBtn" title="Click to grant MIDI permissions or reconnect" class="flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 bg-slate-900 border-slate-700 text-slate-300 hover:border-indigo-500 hover:text-white">
         <span id="midiStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-        <span id="midiStatusText">Request MIDI</span>
+        <span id="midiStatusText">Connect MIDI</span>
       </button>
     </div>
   </header>
@@ -429,8 +429,41 @@
 
   <footer class="w-full max-w-5xl text-center py-3 text-xs text-slate-500 flex flex-wrap justify-between items-center gap-2 border-t border-slate-900 mt-2">
     <div>Standard 25-Key Range: <span class="font-mono text-slate-300 font-bold">C3 (MIDI 48)</span> through <span class="font-mono text-slate-300 font-bold">C5 (MIDI 72)</span> • Middle C = C4 (60)</div>
-    <div id="midiDeviceInfo" class="text-indigo-400/90 font-mono">Click "Request MIDI" above to link your keyboard</div>
+    <div id="midiDeviceInfo" class="text-indigo-400/90 font-mono cursor-pointer hover:underline" title="Click for MIDI troubleshooting">Click "Connect MIDI" above to link your keyboard</div>
   </footer>
+
+  <!-- MIDI Help & Unblock Modal for Android Chrome -->
+  <div id="midiHelpModal" class="fixed inset-0 z-[110] hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-slate-200">
+      <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+        <h4 class="font-bold text-base text-white flex items-center gap-2">
+          <i data-lucide="radio" class="w-5 h-5 text-indigo-400"></i>
+          Android Chrome MIDI Permission
+        </h4>
+        <button id="closeMidiHelpBtn" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="text-xs space-y-3 leading-relaxed text-slate-300">
+        <p>If Chrome displays <strong class="text-rose-400">"MIDI Blocked"</strong>, Android has saved a "Block" decision for this site. To reset it:</p>
+        <ol class="list-decimal list-inside space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800 font-mono text-[11px]">
+          <li>In Chrome, tap the <strong>tune icon / lock icon (🔒 or 🎚️)</strong> on the left side of the address bar.</li>
+          <li>Tap <strong>Permissions</strong> or <strong>Site settings</strong>.</li>
+          <li>Find <strong>MIDI devices</strong> and set it to <strong>Allow</strong> (or tap <em>Clear & Reset</em>).</li>
+          <li>Reload the page and tap <strong>"Connect MIDI"</strong>.</li>
+        </ol>
+        <p class="text-[11px] text-amber-400/90 flex items-start gap-1.5">
+          <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
+          <span>Make sure your USB-C OTG cable or USB adapter is firmly connected to your tablet before tapping Connect.</span>
+        </p>
+      </div>
+      <div class="mt-5 flex justify-end">
+        <button id="midiRetryFromModalBtn" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">
+          Retry Requesting MIDI
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Success Modal -->
   <div id="successModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm transition-opacity duration-300 opacity-0 p-4">
@@ -1596,60 +1629,112 @@
       return mapped;
     }
 
-    function setupWebMIDI() {
+    async function checkExistingMidiPermission() {
+      if (!navigator.requestMIDIAccess) {
+        updateMidiStatusUI('unsupported', 'Web MIDI Unsupported');
+        return;
+      }
+
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const perm = await navigator.permissions.query({ name: 'midi', sysex: false });
+          if (perm.state === 'granted') {
+            setupWebMIDI(false);
+          } else if (perm.state === 'denied') {
+            updateMidiStatusUI('blocked', 'MIDI Blocked in Settings');
+          } else {
+            updateMidiStatusUI('ready', 'Connect MIDI');
+          }
+          perm.onchange = () => checkExistingMidiPermission();
+        } catch (e) {
+          // Permissions API for MIDI might not be available in older WebViews
+          updateMidiStatusUI('ready', 'Connect MIDI');
+        }
+      } else {
+        updateMidiStatusUI('ready', 'Connect MIDI');
+      }
+    }
+
+    function updateMidiStatusUI(status, label, detailText = null) {
       const statusDot = document.getElementById('midiStatusDot');
       const statusText = document.getElementById('midiStatusText');
       const deviceInfo = document.getElementById('midiDeviceInfo');
 
+      if (statusText) statusText.textContent = label;
+
+      if (status === 'active') {
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+      } else if (status === 'requesting') {
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse';
+      } else if (status === 'blocked') {
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+        if (deviceInfo) deviceInfo.textContent = detailText || 'MIDI is blocked in Chrome settings. Tap here to view instructions.';
+      } else if (status === 'unsupported') {
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+        if (deviceInfo) deviceInfo.textContent = 'Web MIDI is not supported on this browser engine.';
+      } else {
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-indigo-400';
+        if (deviceInfo) deviceInfo.textContent = detailText || 'Tap "Connect MIDI" above to link your keyboard.';
+      }
+    }
+
+    async function setupWebMIDI(userInitiated = true) {
+      const deviceInfo = document.getElementById('midiDeviceInfo');
+
       if (!navigator.requestMIDIAccess) {
-        statusDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
-        statusText.textContent = 'MIDI Unsupported';
-        deviceInfo.textContent = 'Web MIDI is not supported in this browser (use keys or touch)';
-        showToast('Web MIDI API is not available in this browser', 'alert-circle');
+        updateMidiStatusUI('unsupported', 'MIDI Unsupported');
+        showToast('Web MIDI API is not available on this browser', 'alert-circle');
         return;
       }
 
-      statusText.textContent = 'Requesting...';
+      updateMidiStatusUI('requesting', 'Requesting...');
 
-      navigator.requestMIDIAccess({ sysex: false })
-        .then(midiAccess => {
-          statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
-          statusText.textContent = 'MIDI Active';
+      try {
+        // Try sysex: false first (standard for note input)
+        const midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+        
+        updateMidiStatusUI('active', 'MIDI Active');
 
-          function listInputs() {
-            const inputs = Array.from(midiAccess.inputs.values());
-            if (inputs.length > 0) {
-              const names = inputs.map(i => i.name).join(', ');
-              deviceInfo.textContent = `Connected: ${names}`;
-              statusText.textContent = `${inputs.length} MIDI Device`;
+        function listInputs() {
+          const inputs = Array.from(midiAccess.inputs.values());
+          if (inputs.length > 0) {
+            const names = inputs.map(i => i.name || 'Generic MIDI Device').join(', ');
+            deviceInfo.textContent = `Connected: ${names}`;
+            updateMidiStatusUI('active', `${inputs.length} MIDI Device`);
+            if (userInitiated) {
               showToast(`MIDI Connected: ${names}`, 'check');
-            } else {
-              deviceInfo.textContent = 'MIDI allowed! Connect your USB keyboard to play';
-              statusText.textContent = 'Awaiting Keyboard';
-              statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
             }
-
-            inputs.forEach(input => {
-              input.onmidimessage = handleMIDIMessage;
-            });
-          }
-
-          listInputs();
-          midiAccess.onstatechange = listInputs;
-        })
-        .catch(err => {
-          console.warn('MIDI Access request failure:', err);
-          statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
-          statusText.textContent = 'MIDI Blocked';
-          
-          if (err.name === 'SecurityError') {
-            deviceInfo.textContent = 'MIDI blocked by iframe permissions policy. You can use computer keyboard or touch.';
-            showToast('MIDI is restricted inside this iframe. Use computer keyboard or open directly.', 'alert-triangle');
           } else {
-            deviceInfo.textContent = 'MIDI permission was not granted. Click "Request MIDI" to re-prompt.';
-            showToast('MIDI permission denied. Click Request MIDI to retry.', 'alert-circle');
+            deviceInfo.textContent = 'MIDI allowed! Connect your USB keyboard via OTG to play';
+            updateMidiStatusUI('requesting', 'Awaiting Keyboard');
           }
-        });
+
+          inputs.forEach(input => {
+            input.onmidimessage = handleMIDIMessage;
+          });
+        }
+
+        listInputs();
+        midiAccess.onstatechange = listInputs;
+
+      } catch (err) {
+        console.warn('MIDI Access request failure:', err);
+        const errMsg = err && err.name ? err.name : 'UnknownError';
+
+        if (errMsg === 'SecurityError') {
+          updateMidiStatusUI('blocked', 'MIDI Restricted', 'Iframe security restrictions blocked MIDI. Open site directly.');
+          showToast('MIDI blocked by security policy. Open URL directly.', 'alert-triangle');
+        } else if (errMsg === 'NotAllowedError') {
+          updateMidiStatusUI('blocked', 'MIDI Denied', 'Permission denied in Chrome. Tap here for steps to unblock.');
+          if (userInitiated) {
+            document.getElementById('midiHelpModal').classList.remove('hidden');
+            document.getElementById('midiHelpModal').classList.add('flex');
+          }
+        } else {
+          updateMidiStatusUI('blocked', 'MIDI Error', `${errMsg}: Tap to troubleshoot.`);
+          showToast(`MIDI Error (${errMsg}). Tap footer for help.`, 'alert-circle');
+        }
+      }
     }
 
     function handleMIDIMessage(event) {
@@ -1864,7 +1949,29 @@
       // Explicit user-gesture button for MIDI permission
       document.getElementById('midiConnectBtn').addEventListener('click', () => {
         audio.init();
-        setupWebMIDI();
+        setupWebMIDI(true);
+      });
+
+      // Footer helper trigger to unblock
+      document.getElementById('midiDeviceInfo').addEventListener('click', () => {
+        const modal = document.getElementById('midiHelpModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        lucide.createIcons();
+      });
+
+      document.getElementById('closeMidiHelpBtn').addEventListener('click', () => {
+        const modal = document.getElementById('midiHelpModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      });
+
+      document.getElementById('midiRetryFromModalBtn').addEventListener('click', () => {
+        const modal = document.getElementById('midiHelpModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        audio.init();
+        setupWebMIDI(true);
       });
     }
 
@@ -1894,7 +2001,7 @@
       setupEventListeners();
       setupComputerKeyboard();
       rebuildAvailableChords();
-      setupWebMIDI();
+      checkExistingMidiPermission();
       nextChord();
     };
   </script>
