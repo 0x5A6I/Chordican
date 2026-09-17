@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Piano Chord Master - 25-Key MIDI Trainer (C3-C5)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Canvas Confetti CDN for rewards -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Piano Key Layout & Styling */
+    .piano-board {
+      position: relative;
+      height: 200px;
+      display: flex;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.1);
+    }
+
+    .mini-piano-board {
+      position: relative;
+      height: 80px;
+      display: flex;
+    }
+
+    .white-key {
+      flex: 1;
+      height: 100%;
+      background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 88%, #e5e7eb 100%);
+      border: 1px solid #9ca3af;
+      border-bottom: 5px solid #6b7280;
+      border-radius: 0 0 7px 7px;
+      position: relative;
+      z-index: 1;
+      cursor: pointer;
+      transition: background 0.08s, transform 0.06s, box-shadow 0.08s;
+    }
+
+    .white-key:hover {
+      background: linear-gradient(to bottom, #ffffff 0%, #f3f4f6 90%, #d1d5db 100%);
+    }
+
+    .white-key.active-pressed {
+      background: linear-gradient(to bottom, #60a5fa 0%, #3b82f6 90%, #2563eb 100%) !important;
+      border-bottom-width: 2px;
+      transform: translateY(3px);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
+    }
+
+    .white-key.active-correct {
+      background: linear-gradient(to bottom, #4ade80 0%, #22c55e 90%, #16a34a 100%) !important;
+      border-bottom-width: 2px;
+      transform: translateY(3px);
+      box-shadow: 0 2px 10px rgba(34, 197, 94, 0.6);
+    }
+
+    .white-key.active-target {
+      background: linear-gradient(to bottom, #fef08a 0%, #facc15 90%, #eab308 100%) !important;
+    }
+
+    .black-key {
+      position: absolute;
+      top: 0;
+      width: 4.8%;
+      height: 60%;
+      background: linear-gradient(to bottom, #27272a 0%, #09090b 85%, #18181b 100%);
+      border: 1px solid #000;
+      border-bottom: 4px solid #000;
+      border-radius: 0 0 5px 5px;
+      z-index: 2;
+      cursor: pointer;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      transition: background 0.08s, transform 0.06s;
+    }
+
+    .black-key.active-pressed {
+      background: linear-gradient(to bottom, #3b82f6 0%, #1d4ed8 90%, #1e40af 100%) !important;
+      border-bottom-width: 2px;
+      transform: translateY(2px);
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.7);
+    }
+
+    .black-key.active-correct {
+      background: linear-gradient(to bottom, #22c55e 0%, #15803d 90%, #166534 100%) !important;
+      border-bottom-width: 2px;
+      transform: translateY(2px);
+      box-shadow: 0 2px 12px rgba(34, 197, 94, 0.8);
+    }
+
+    .black-key.active-target {
+      background: linear-gradient(to bottom, #facc15 0%, #ca8a04 90%, #a16207 100%) !important;
+    }
+
+    /* Key indicators for hints & computer keyboard shortcuts */
+    .key-indicator {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 9999px;
+      pointer-events: none;
+    }
+
+    .key-shortcut-hint {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      font-weight: 700;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 9999px;
+    }
+    
+    /* Clean up SVG rendering */
+    svg {
+      shape-rendering: geometricPrecision;
+    }
+    
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-3 md:p-6 overflow-x-hidden selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header & Top Controls -->
+  <header class="w-full max-w-5xl flex flex-wrap items-center justify-between gap-4 py-2 border-b border-slate-800/80 mb-4">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-500 to-amber-400 p-0.5 shadow-lg shadow-indigo-500/20">
+        <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+          <i data-lucide="music-2" class="w-5 h-5 text-indigo-400"></i>
+        </div>
+      </div>
+      <div>
+        <h1 class="text-xl md:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-300">
+          Chordican <span class="text-xs px-2 py-0.5 ml-1.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold tracking-normal border border-emerald-500/30">C3–C5 (25 Keys)</span>
+        </h1>
+        <p class="text-xs text-slate-400 font-medium">Interactive MIDI & Keyboard Chord Trainer</p>
+      </div>
+    </div>
+
+    <!-- Live Game Stats & MIDI Indicators -->
+    <div class="flex flex-wrap items-center gap-2.5">
+      <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 shadow-sm">
+        <i data-lucide="flame" class="w-4 h-4 text-amber-400 animate-pulse"></i>
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Streak</span>
+        <span id="streakCount" class="font-mono font-bold text-amber-400 text-sm">0</span>
+      </div>
+      <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 shadow-sm">
+        <i data-lucide="award" class="w-4 h-4 text-emerald-400"></i>
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Score</span>
+        <span id="scoreCount" class="font-mono font-bold text-emerald-400 text-sm">0</span>
+      </div>
+
+      <!-- Realtime Incoming MIDI Note Monitor -->
+      <div id="midiInBadge" class="hidden sm:flex items-center space-x-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-400 font-mono" title="Last MIDI Note Received">
+        <span class="text-[10px] text-slate-500 uppercase">MIDI:</span>
+        <span id="midiLastInText" class="text-indigo-400 font-bold">Waiting</span>
+      </div>
+
+      <!-- MIDI Status / Request Button -->
+      <button id="midiConnectBtn" title="Click to grant MIDI permissions or reconnect" class="flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 bg-slate-900 border-slate-700 text-slate-300 hover:border-indigo-500 hover:text-white">
+        <span id="midiStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+        <span id="midiStatusText">Request MIDI</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-5xl flex-1 flex flex-col gap-4">
+
+    <!-- Challenge Card & Visual Notation Display -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+
+      <!-- Left: Target Chord Card & Controls -->
+      <div class="md:col-span-6 bg-slate-900/90 backdrop-blur border border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between shadow-xl relative overflow-hidden group">
+        <div class="absolute -right-12 -top-12 w-36 h-36 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <span class="text-xs uppercase font-bold tracking-widest text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="target" class="w-3.5 h-3.5 text-indigo-400"></i> Target Chord
+          </span>
+          <span id="chordCategoryBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold border border-slate-700">
+            Major Triad
+          </span>
+        </div>
+
+        <div class="my-4 text-center">
+          <!-- Hint 2: Chord Name (Can be hidden/revealed) -->
+          <div id="chordNameContainer" class="transition-all duration-300 min-h-[76px] flex flex-col items-center justify-center">
+            <h2 id="chordNameText" class="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-1">
+              C Maj
+            </h2>
+            <p id="chordFormulaText" class="text-xs font-mono text-indigo-400">Root: C3 • 1 - 3 - 5</p>
+          </div>
+          <div id="chordNameHiddenMessage" class="hidden min-h-[76px] flex items-center justify-center text-slate-500 italic text-sm">
+            <i data-lucide="eye-off" class="w-4 h-4 mr-1.5"></i> Name hint hidden (Identify by notation/ear!)
+          </div>
+        </div>
+
+        <!-- Interactive Action Buttons -->
+        <div class="flex items-center gap-2 pt-2">
+          <!-- Hint 3: Play Chord Sound -->
+          <button id="hearChordBtn" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 active:scale-95 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition">
+            <i data-lucide="volume-2" class="w-4 h-4 text-indigo-400"></i>
+            <span>Hear Chord (Hint)</span>
+          </button>
+          
+          <button id="skipChordBtn" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs font-semibold transition border border-slate-700" title="Skip chord">
+            <i data-lucide="skip-forward" class="w-4 h-4"></i>
+          </button>
+          
+          <button id="showSolutionBtn" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-300 text-xs font-semibold transition border border-slate-700" title="Reveal target keys on piano">
+            <i data-lucide="help-circle" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Right: Sheet Music Notation Display (Hint 1 - Treble Clef for C3-C5) -->
+      <div class="md:col-span-6 bg-slate-900/90 backdrop-blur border border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between shadow-xl relative overflow-hidden">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <span class="text-xs uppercase font-bold tracking-widest text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="file-text" class="w-3.5 h-3.5 text-violet-400"></i> Music Notation
+          </span>
+          <span id="notationClefLabel" class="text-xs text-slate-400 font-mono">Grand Staff (C3 to C5)</span>
+        </div>
+
+        <!-- SVG Grand Staff Notation Container - White Paper Theme -->
+        <div id="notationViewWrapper" class="relative w-full h-56 flex items-center justify-center bg-white rounded-xl border-4 border-slate-200 my-3 overflow-hidden shadow-inner">
+          <svg id="musicStaffSvg" viewBox="0 0 340 240" class="w-full h-full max-w-[380px]">
+            <!-- Dynamic SVG notes will be generated here -->
+          </svg>
+          <div id="notationHiddenCover" class="hidden absolute inset-0 bg-white/95 flex flex-col items-center justify-center text-slate-600 text-sm font-bold backdrop-blur-sm z-10">
+            <i data-lucide="eye-off" class="w-6 h-6 mb-2 text-slate-400"></i>
+            <span>Notation hint is disabled</span>
+          </div>
+        </div>
+
+        <!-- Live Feedback status bar -->
+        <div class="flex items-center justify-between text-xs px-1">
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400">Holding keys:</span>
+            <span id="currentlyHeldNotesText" class="font-mono text-indigo-300 font-bold">None</span>
+          </div>
+          <div id="matchStatusText" class="font-bold text-amber-400 flex items-center gap-1">
+            <span>Play notes together</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+      
+      <!-- Category Selection Tabs -->
+      <div class="w-full xl:w-auto flex flex-col gap-1.5">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+          <i data-lucide="sliders" class="w-3.5 h-3.5 text-slate-400"></i> Chord Categories:
+        </span>
+        <div class="flex flex-wrap gap-1.5" id="categoryPillContainer">
+          <!-- Categories filled via JS -->
+        </div>
+      </div>
+
+      <!-- Hint Switches & MIDI Config -->
+      <div class="w-full xl:w-auto flex flex-wrap items-center gap-3 border-t xl:border-t-0 xl:border-l border-slate-800 pt-3 xl:pt-0 xl:pl-4">
+        
+        <!-- Active Hints -->
+        <div class="flex flex-col gap-1.5">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i> Active Hints:
+          </span>
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Hint 1: Sheet Music Notation -->
+            <label class="flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 cursor-pointer px-2.5 py-1.5 rounded-lg border border-slate-700/80 transition text-xs select-none">
+              <input type="checkbox" id="hintNotationToggle" checked class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 bg-slate-900 border-slate-600">
+              <span>Notation</span>
+            </label>
+
+            <!-- Hint 2: Chord Name -->
+            <label class="flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 cursor-pointer px-2.5 py-1.5 rounded-lg border border-slate-700/80 transition text-xs select-none">
+              <input type="checkbox" id="hintNameToggle" checked class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 bg-slate-900 border-slate-600">
+              <span>Chord Name</span>
+            </label>
+
+            <!-- Hint 3: Audio Autoplay on Next -->
+            <label class="flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 cursor-pointer px-2.5 py-1.5 rounded-lg border border-slate-700/80 transition text-xs select-none">
+              <input type="checkbox" id="hintSoundToggle" checked class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 bg-slate-900 border-slate-600">
+              <span>Auto Audio</span>
+            </label>
+
+            <!-- Bonus Hint: Key Highlights Guide -->
+            <label class="flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 cursor-pointer px-2.5 py-1.5 rounded-lg border border-slate-700/80 transition text-xs select-none">
+              <input type="checkbox" id="hintKeyGuideToggle" class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-0 focus:ring-offset-0 bg-slate-900 border-slate-600">
+              <span>Key Hints</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- MIDI Range & Octave Options -->
+        <div class="flex flex-col gap-1.5 border-t sm:border-t-0 sm:border-l border-slate-800 pt-2 sm:pt-0 sm:pl-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+            <i data-lucide="radio" class="w-3.5 h-3.5 text-indigo-400"></i> MIDI Matching:
+          </span>
+          <div class="flex items-center gap-2">
+            <!-- Octave Tolerance Selector -->
+            <select id="octaveMatchMode" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 cursor-pointer" title="How MIDI keys are matched to C3-C5">
+              <option value="any">Any Octave (Flexible)</option>
+              <option value="strict">Strict C3–C5</option>
+            </select>
+
+            <!-- Hardware Octave Transpose -->
+            <select id="midiOctaveShift" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 cursor-pointer" title="Hardware Octave Transpose for your MIDI Controller">
+              <option value="0">Shift: 0</option>
+              <option value="12">+1 Octave</option>
+              <option value="24">+2 Octaves</option>
+              <option value="-12">-1 Octave</option>
+              <option value="-24">-2 Octaves</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- Key Signature Mode Selector -->
+        <div class="flex flex-col gap-1.5 border-t sm:border-t-0 sm:border-l border-slate-800 pt-2 sm:pt-0 sm:pl-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+            <i data-lucide="music" class="w-3.5 h-3.5 text-violet-400"></i> Key Signature:
+          </span>
+          <select id="keySignatureMode" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2 py-1.5 outline-none focus:border-violet-500 cursor-pointer">
+            <option value="auto">Auto (Best Fit)</option>
+            <option value="0">0 (C Major)</option>
+            <optgroup label="Sharp Keys">
+              <option value="1">1 ♯ (G Major)</option>
+              <option value="2">2 ♯ (D Major)</option>
+              <option value="3">3 ♯ (A Major)</option>
+              <option value="4">4 ♯ (E Major)</option>
+              <option value="5">5 ♯ (B Major)</option>
+            </optgroup>
+            <optgroup label="Flat Keys">
+              <option value="-1">1 ♭ (F Major)</option>
+              <option value="-2">2 ♭ (Bb Major)</option>
+              <option value="-3">3 ♭ (Eb Major)</option>
+              <option value="-4">4 ♭ (Ab Major)</option>
+              <option value="-5">5 ♭ (Db Major)</option>
+            </optgroup>
+          </select>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 25-Key Interactive Keyboard Wrapper (C3 = MIDI 48 to C5 = MIDI 72) -->
+    <div class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6 shadow-2xl flex flex-col gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 px-1">
+        <span class="flex items-center gap-1.5 font-medium">
+          <i data-lucide="keyboard" class="w-3.5 h-3.5 text-indigo-400"></i>
+          Play via MIDI, Click/Touch, or Keyboard (Keys Z–M & Q–I)
+        </span>
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Pressed</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Correct</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Target Guide</span>
+        </div>
+      </div>
+
+      <!-- Piano Board Container -->
+      <div class="w-full overflow-x-auto custom-scrollbar pb-2 pt-1">
+        <div id="pianoBoard" class="piano-board min-w-[640px] w-full rounded-b-xl border-t-8 border-slate-800 bg-slate-950">
+          <!-- 25 Piano keys generated by script -->
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="w-full max-w-5xl text-center py-3 text-xs text-slate-500 flex flex-wrap justify-between items-center gap-2 border-t border-slate-900 mt-2">
+    <div>Standard 25-Key Range: <span class="font-mono text-slate-300 font-bold">C3 (MIDI 48)</span> through <span class="font-mono text-slate-300 font-bold">C5 (MIDI 72)</span> • Middle C = C4 (60)</div>
+    <div id="midiDeviceInfo" class="text-indigo-400/90 font-mono">Click "Request MIDI" above to link your keyboard</div>
+  </footer>
+
+  <!-- Success Modal -->
+  <div id="successModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm transition-opacity duration-300 opacity-0 p-4">
+    <div id="successModalContent" class="bg-slate-900 border border-emerald-500/40 rounded-2xl p-5 md:p-8 max-w-md w-full mx-auto shadow-2xl shadow-emerald-900/20 transform scale-95 translate-y-4 transition-all duration-300 flex flex-col items-center text-center max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <div class="w-16 h-16 shrink-0 bg-emerald-500/20 rounded-full flex items-center justify-center mb-3 shadow-inner shadow-emerald-500/20">
+        <i data-lucide="check-circle-2" class="w-8 h-8 text-emerald-400"></i>
+      </div>
+      <h3 class="text-3xl font-black text-white mb-1" id="modalChordName">C Major</h3>
+      <p class="text-sm text-emerald-400 font-semibold mb-4 uppercase tracking-wider">Perfect Match!</p>
+
+      <!-- Notation display -->
+      <div class="w-full shrink-0 bg-white rounded-xl border-4 border-slate-200 mb-4 shadow-inner overflow-hidden flex items-center justify-center h-32">
+         <svg id="modalMusicSvg" viewBox="0 0 340 240" class="w-full h-full max-w-[240px]"></svg>
+      </div>
+
+      <!-- Mini Piano Visual Guide -->
+      <div class="w-full shrink-0 bg-slate-950/50 rounded-xl p-3 border border-slate-800 mb-4 overflow-x-auto custom-scrollbar">
+        <p class="text-[10px] text-slate-400 uppercase tracking-widest mb-2 font-bold">Keyboard View</p>
+        <div id="modalMiniPiano" class="mini-piano-board min-w-[320px] w-full rounded-b border-t-[6px] border-slate-800 bg-slate-950">
+          <!-- Keys injected via JS -->
+        </div>
+      </div>
+
+      <!-- Keys pressed display -->
+      <div class="w-full shrink-0 bg-slate-950/50 rounded-xl p-3 border border-slate-800">
+        <p class="text-[10px] text-slate-400 uppercase tracking-widest mb-2 font-bold">Keys Played</p>
+        <div id="modalKeysContainer" class="flex flex-wrap justify-center gap-2">
+          <!-- Keys injected via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast" class="fixed bottom-6 right-6 pointer-events-none transition-all duration-300 transform translate-y-12 opacity-0 bg-slate-900 border border-indigo-500/40 text-slate-100 px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-3 text-sm">
+    <i id="toastIcon" data-lucide="info" class="w-5 h-5 text-indigo-400"></i>
+    <span id="toastMsg">Ready</span>
+  </div>
+
+  <script>
+    /* ==========================================================
+       Acoustic Grand Piano Physical Modeling Audio Engine
+       - Dual-string unison beating (coupled oscillators)
+       - Dynamic FM hammer excitation (fast decay overtones)
+       - Physical felt-hammer strike transient (noise burst)
+       - String inharmonicity modeling (stiff wire acoustics)
+       - Wooden soundboard formant & body resonance filter
+       ========================================================== */
+    class PianoAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.activeVoices = new Map();
+        this.hammerBuffer = null;
+        this.soundboardBus = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+          this.buildHammerBuffer();
+          this.buildSoundboardBus();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      buildSoundboardBus() {
+        // Acoustic Grand Piano Soundboard Formant
+        const soundboard = this.ctx.createGain();
+        soundboard.gain.setValueAtTime(1.0, this.ctx.currentTime);
+
+        // Low-mid wooden body warmth (240Hz spruce resonance)
+        const bodyResonance = this.ctx.createBiquadFilter();
+        bodyResonance.type = 'peaking';
+        bodyResonance.frequency.setValueAtTime(240, this.ctx.currentTime);
+        bodyResonance.Q.setValueAtTime(1.4, this.ctx.currentTime);
+        bodyResonance.gain.setValueAtTime(3.5, this.ctx.currentTime);
+
+        // Natural high-frequency air damping (felt & soundboard absorption)
+        const airDamp = this.ctx.createBiquadFilter();
+        airDamp.type = 'lowpass';
+        airDamp.frequency.setValueAtTime(6500, this.ctx.currentTime);
+        airDamp.Q.setValueAtTime(0.7, this.ctx.currentTime);
+
+        // Master compressor to avoid clipping on heavy chords
+        const comp = this.ctx.createDynamicsCompressor();
+        comp.threshold.setValueAtTime(-8, this.ctx.currentTime);
+        comp.knee.setValueAtTime(12, this.ctx.currentTime);
+        comp.ratio.setValueAtTime(3, this.ctx.currentTime);
+        comp.attack.setValueAtTime(0.003, this.ctx.currentTime);
+        comp.release.setValueAtTime(0.18, this.ctx.currentTime);
+
+        soundboard.connect(bodyResonance);
+        bodyResonance.connect(airDamp);
+        airDamp.connect(comp);
+        comp.connect(this.ctx.destination);
+
+        this.soundboardBus = soundboard;
+      }
+
+      // Pre-synthesize felt hammer strike noise (12ms transient)
+      buildHammerBuffer() {
+        const bufferLength = Math.floor(this.ctx.sampleRate * 0.015);
+        const buffer = this.ctx.createBuffer(1, bufferLength, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferLength; i++) {
+          const decay = Math.exp(-i / (bufferLength * 0.22));
+          data[i] = (Math.random() * 2 - 1) * decay;
+        }
+        this.hammerBuffer = buffer;
+      }
+
+      midiToFreq(midi) {
+        return 440 * Math.pow(2, (midi - 69) / 12);
+      }
+
+      noteOn(midi, rawVelocity = 90) {
+        this.init();
+        if (this.activeVoices.has(midi)) {
+          this.noteOff(midi);
+        }
+
+        const now = this.ctx.currentTime;
+        const freq = this.midiToFreq(midi);
+        const vel = Math.max(0.15, Math.min(1.0, rawVelocity / 127));
+
+        // Master gain for this individual key
+        const voiceGain = this.ctx.createGain();
+        voiceGain.gain.setValueAtTime(0.0001, now);
+
+        // Quick 2.5ms attack to avoid clicks while keeping prompt hammer response
+        const peakGain = 0.32 * Math.pow(vel, 1.25);
+        voiceGain.gain.linearRampToValueAtTime(peakGain, now + 0.003);
+
+        // Natural piano two-stage decay:
+        // Stage 1: Fast initial prompt dissipation (hammer rebound)
+        voiceGain.gain.exponentialRampToValueAtTime(peakGain * 0.55, now + 0.18);
+        // Stage 2: Long resonant acoustic string singing sustain
+        voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + 4.2);
+
+        // String Inharmonicity coefficient (stiff piano steel wire)
+        const B = 0.00035;
+
+        // --- STRING 1: Fundamental Carrier + FM Modulation ---
+        const carrier1 = this.ctx.createOscillator();
+        carrier1.type = 'sine';
+        carrier1.frequency.setValueAtTime(freq, now);
+
+        // Modulator 1: Adds metallic initial brightness that damps quickly
+        const mod1 = this.ctx.createOscillator();
+        mod1.type = 'sine';
+        mod1.frequency.setValueAtTime(freq, now);
+
+        const mod1Gain = this.ctx.createGain();
+        const modIndex = freq * (1.8 + vel * 2.2);
+        mod1Gain.gain.setValueAtTime(modIndex, now);
+        mod1Gain.gain.exponentialRampToValueAtTime(1.0, now + 0.16);
+
+        mod1.connect(mod1Gain);
+        mod1Gain.connect(carrier1.frequency);
+
+        // --- STRING 2: Coupled Unison String (Detuned +0.85 cents) ---
+        // Mimics the acoustic multi-string chorus & beating of real pianos
+        const carrier2 = this.ctx.createOscillator();
+        carrier2.type = 'sine';
+        carrier2.frequency.setValueAtTime(freq * Math.pow(2, 0.85 / 1200), now);
+
+        // Modulator 2 (Octave partial ring)
+        const mod2 = this.ctx.createOscillator();
+        mod2.type = 'sine';
+        mod2.frequency.setValueAtTime(freq * 2, now);
+
+        const mod2Gain = this.ctx.createGain();
+        mod2Gain.gain.setValueAtTime(freq * 0.7 * vel, now);
+        mod2Gain.gain.exponentialRampToValueAtTime(0.5, now + 0.09);
+
+        mod2.connect(mod2Gain);
+        mod2Gain.connect(carrier2.frequency);
+
+        // --- STRING 3: Inharmonic 3rd Partial Ring ---
+        const f3 = freq * 3 * Math.sqrt(1 + B * 9);
+        const osc3 = this.ctx.createOscillator();
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(f3, now);
+
+        const osc3Gain = this.ctx.createGain();
+        const partial3Level = 0.16 * vel;
+        osc3Gain.gain.setValueAtTime(partial3Level, now);
+        osc3Gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+        osc3.connect(osc3Gain);
+        osc3Gain.connect(voiceGain);
+
+        // Connect strings to voice bus
+        carrier1.connect(voiceGain);
+        carrier2.connect(voiceGain);
+
+        // --- HAMMER TRANSIENT: Felt Strike Click ---
+        if (this.hammerBuffer) {
+          const hammer = this.ctx.createBufferSource();
+          hammer.buffer = this.hammerBuffer;
+
+          const hammerFilter = this.ctx.createBiquadFilter();
+          hammerFilter.type = 'bandpass';
+          hammerFilter.frequency.setValueAtTime(Math.min(2200, freq * 2.2), now);
+          hammerFilter.Q.setValueAtTime(2.0, now);
+
+          const hammerGain = this.ctx.createGain();
+          hammerGain.gain.setValueAtTime(0.24 * vel, now);
+
+          hammer.connect(hammerFilter);
+          hammerFilter.connect(hammerGain);
+          hammerGain.connect(this.soundboardBus);
+
+          hammer.start(now);
+        }
+
+        // Send voice to wooden soundboard bus
+        voiceGain.connect(this.soundboardBus);
+
+        carrier1.start(now);
+        mod1.start(now);
+        carrier2.start(now);
+        mod2.start(now);
+        osc3.start(now);
+
+        this.activeVoices.set(midi, {
+          nodes: [carrier1, mod1, carrier2, mod2, osc3],
+          voiceGain,
+          startTime: now
+        });
+      }
+
+      noteOff(midi) {
+        if (!this.ctx || !this.activeVoices.has(midi)) return;
+        const voice = this.activeVoices.get(midi);
+        const now = this.ctx.currentTime;
+
+        // Acoustic felt damper landing on strings (140ms release envelope)
+        voice.voiceGain.gain.cancelScheduledValues(now);
+        voice.voiceGain.gain.setValueAtTime(voice.voiceGain.gain.value, now);
+        voice.voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+
+        setTimeout(() => {
+          voice.nodes.forEach(node => {
+            try { node.stop(); node.disconnect(); } catch (e) {}
+          });
+          try { voice.voiceGain.disconnect(); } catch (e) {}
+        }, 180);
+
+        this.activeVoices.delete(midi);
+      }
+
+      playSuccessChime() {
+        this.init();
+        const now = this.ctx.currentTime;
+        
+        // Frequencies for a sparkling UI success chime (C6, E6, G6, C7)
+        const freqs = [1046.50, 1318.51, 1567.98, 2093.00]; 
+        
+        freqs.forEach((freq, i) => {
+          const delay = i * 0.07; // 70ms between each sparkle note
+          
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + delay);
+          
+          // Bell-like FM synthesis modifier for extra "sparkle"
+          const mod = this.ctx.createOscillator();
+          const modGain = this.ctx.createGain();
+          mod.type = 'sine';
+          mod.frequency.setValueAtTime(freq * 2.78, now + delay); 
+          modGain.gain.setValueAtTime(freq * 0.8, now + delay);
+          modGain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.3);
+          mod.connect(modGain);
+          modGain.connect(osc.frequency);
+          
+          // Fast attack, smooth decay envelope
+          gain.gain.setValueAtTime(0, now + delay);
+          gain.gain.linearRampToValueAtTime(0.12, now + delay + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 1.2);
+          
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          
+          osc.start(now + delay);
+          mod.start(now + delay);
+          osc.stop(now + delay + 1.5);
+          mod.stop(now + delay + 1.5);
+        });
+      }
+
+      playChord(midiArray, duration = 4.0) {
+        this.init();
+        // Slow arpeggiation delay (200ms) to clearly hear each note joining the chord
+        const rollDelayMs = 200;
+        
+        midiArray.forEach((midi, idx) => {
+          setTimeout(() => {
+            this.noteOn(midi, 88);
+            setTimeout(() => {
+              this.noteOff(midi);
+            }, duration * 1000);
+          }, idx * rollDelayMs);
+        });
+      }
+    }
+
+    const audio = new PianoAudioEngine();
+
+    /* ==========================================================
+       Data Models: 25 Keys (C3 to C5: MIDI 48 to 72)
+       ========================================================== */
+    const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+    // Map computer keyboard keys for testing without MIDI controller
+    const KEYBOARD_MAP = {
+      'KeyZ': 48, // C3
+      'KeyS': 49, // C#3
+      'KeyX': 50, // D3
+      'KeyD': 51, // D#3
+      'KeyC': 52, // E3
+      'KeyV': 53, // F3
+      'KeyG': 54, // F#3
+      'KeyB': 55, // G3
+      'KeyH': 56, // G#3
+      'KeyN': 57, // A3
+      'KeyJ': 58, // A#3
+      'KeyM': 59, // B3
+      'KeyQ': 60, // C4 (Middle C)
+      'Digit2': 61, // C#4
+      'KeyW': 62, // D4
+      'Digit3': 63, // D#4
+      'KeyE': 64, // E4
+      'KeyR': 65, // F4
+      'Digit5': 66, // F#4
+      'KeyT': 67, // G4
+      'Digit6': 68, // G#4
+      'KeyY': 69, // A4
+      'Digit7': 70, // A#4
+      'KeyU': 71, // B4
+      'KeyI': 72  // C5
+    };
+    
+    // Generate exactly 25 keys metadata from C3 (MIDI 48) to C5 (MIDI 72)
+    const KEYS_DATA = [];
+    for (let midi = 48; midi <= 72; midi++) {
+      const pitchClass = midi % 12;
+      const octave = Math.floor(midi / 12) - 1; // 48/12 - 1 = 3
+      const noteName = NOTE_NAMES[pitchClass];
+      const isBlack = noteName.includes('#');
+
+      // Find shortcut label
+      const shortcutEntry = Object.entries(KEYBOARD_MAP).find(([k, val]) => val === midi);
+      const shortcut = shortcutEntry ? shortcutEntry[0].replace('Key', '').replace('Digit', '') : '';
+
+      KEYS_DATA.push({
+        midi,
+        pitchClass,
+        name: noteName,
+        fullName: `${noteName}${octave}`,
+        isBlack,
+        octave,
+        shortcut
+      });
+    }
+
+    const CHORD_CATEGORIES = {
+      easy: { id: 'easy', label: 'Easy (Triads)', active: true },
+      suspended: { id: 'suspended', label: 'Sus & 5ths', active: true },
+      seventh: { id: 'seventh', label: '7th Chords', active: true },
+      advanced: { id: 'advanced', label: 'Advanced', active: false }
+    };
+
+    // Chord interval definitions relative to root note
+    const CHORD_TYPES = [
+      // Easy / Basic Triads
+      { name: 'Major', symbol: 'Maj', intervals: [0, 4, 7], category: 'easy', formula: '1 - 3 - 5' },
+      { name: 'Minor', symbol: 'm', intervals: [0, 3, 7], category: 'easy', formula: '1 - b3 - 5' },
+      
+      // Suspended & 5ths
+      { name: 'Suspended 4th', symbol: 'sus4', intervals: [0, 5, 7], category: 'suspended', formula: '1 - 4 - 5' },
+      { name: 'Suspended 2nd', symbol: 'sus2', intervals: [0, 2, 7], category: 'suspended', formula: '1 - 2 - 5' },
+      { name: 'Power Chord', symbol: '5', intervals: [0, 7, 12], category: 'suspended', formula: '1 - 5 - 8' },
+
+      // 7ths
+      { name: 'Dominant 7th', symbol: '7', intervals: [0, 4, 7, 10], category: 'seventh', formula: '1 - 3 - 5 - b7' },
+      { name: 'Minor 7th', symbol: 'm7', intervals: [0, 3, 7, 10], category: 'seventh', formula: '1 - b3 - 5 - b7' },
+      { name: 'Major 7th', symbol: 'Maj7', intervals: [0, 4, 7, 11], category: 'seventh', formula: '1 - 3 - 5 - 7' },
+
+      // Advanced
+      { name: 'Diminished', symbol: 'dim', intervals: [0, 3, 6], category: 'advanced', formula: '1 - b3 - b5' },
+      { name: 'Augmented', symbol: 'aug', intervals: [0, 4, 8], category: 'advanced', formula: '1 - 3 - #5' },
+      { name: 'Half-Diminished', symbol: 'm7b5', intervals: [0, 3, 6, 10], category: 'advanced', formula: '1 - b3 - b5 - b7' }
+    ];
+
+    // Music Theory Spelling Maps for 12 Pitch Classes
+    // { d: diatonic offset from C (0-6), a: accidental (+1 sharp, -1 flat, 0 natural) }
+    const SPELL_S = [ {d:0, a:0}, {d:0, a:1}, {d:1, a:0}, {d:1, a:1}, {d:2, a:0}, {d:3, a:0}, {d:3, a:1}, {d:4, a:0}, {d:4, a:1}, {d:5, a:0}, {d:5, a:1}, {d:6, a:0} ];
+    const SPELL_F = [ {d:0, a:0}, {d:1, a:-1}, {d:1, a:0}, {d:2, a:-1}, {d:2, a:0}, {d:3, a:0}, {d:4, a:-1}, {d:4, a:0}, {d:5, a:-1}, {d:5, a:0}, {d:6, a:-1}, {d:6, a:0} ];
+    const DIATONIC_NAMES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+    const state = {
+      activeHeldMidis: new Set(),
+      targetChord: null,
+      score: 0,
+      streak: 0,
+      showSolution: false,
+      midiOctaveShift: 0,
+      octaveMatchMode: 'any', // 'any' or 'strict'
+      keySignatureMode: 'auto',
+      activeKeySignature: 0,
+      waitForMidiRelease: false,
+      hints: {
+        notation: true,
+        name: true,
+        sound: true,
+        keyGuide: false
+      }
+    };
+
+    /* ==========================================================
+       Interactive Keyboard Rendering & Interaction
+       ========================================================== */
+    const pianoBoardEl = document.getElementById('pianoBoard');
+
+    function buildPianoBoard() {
+      pianoBoardEl.innerHTML = '';
+      const whiteKeys = KEYS_DATA.filter(k => !k.isBlack);
+      const totalWhite = whiteKeys.length; // 15 white keys: C3 to C5
+
+      // 1. Create White Keys
+      whiteKeys.forEach((keyInfo) => {
+        const keyDiv = document.createElement('div');
+        keyDiv.className = 'white-key';
+        keyDiv.dataset.midi = keyInfo.midi;
+        keyDiv.dataset.name = keyInfo.fullName;
+
+        // Label for special landmark keys (C3, C4 = Middle C, C5)
+        if (keyInfo.name === 'C') {
+          const label = document.createElement('span');
+          label.className = 'absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] font-extrabold text-slate-500 pointer-events-none font-mono';
+          label.textContent = keyInfo.fullName === 'C4' ? 'C4 (Mid)' : keyInfo.fullName;
+          keyDiv.appendChild(label);
+        }
+
+        // Computer key hint
+        const hint = document.createElement('span');
+        hint.className = 'key-shortcut-hint';
+        hint.textContent = keyInfo.shortcut;
+        keyDiv.appendChild(hint);
+
+        // Indicator dot for hint/solution
+        const dot = document.createElement('div');
+        dot.className = 'key-indicator hidden';
+        keyDiv.appendChild(dot);
+
+        pianoBoardEl.appendChild(keyDiv);
+      });
+
+      // 2. Overlay Black Keys accurately
+      const blackKeys = KEYS_DATA.filter(k => k.isBlack);
+      blackKeys.forEach(keyInfo => {
+        const prevWhiteIndex = whiteKeys.findIndex(wk => wk.midi === keyInfo.midi - 1);
+        if (prevWhiteIndex !== -1) {
+          const leftPercent = ((prevWhiteIndex + 1) / totalWhite) * 100;
+          const blackKeyDiv = document.createElement('div');
+          blackKeyDiv.className = 'black-key';
+          blackKeyDiv.dataset.midi = keyInfo.midi;
+          blackKeyDiv.dataset.name = keyInfo.fullName;
+          blackKeyDiv.style.left = `calc(${leftPercent}% - 2.4%)`;
+
+          const dot = document.createElement('div');
+          dot.className = 'key-indicator hidden';
+          blackKeyDiv.appendChild(dot);
+
+          pianoBoardEl.appendChild(blackKeyDiv);
+        }
+      });
+
+      attachPointerListeners();
+    }
+
+    function attachPointerListeners() {
+      const keys = pianoBoardEl.querySelectorAll('.white-key, .black-key');
+      let isPointerDown = false;
+
+      window.addEventListener('pointerup', () => {
+        isPointerDown = false;
+      });
+
+      keys.forEach(keyEl => {
+        const midi = parseInt(keyEl.dataset.midi, 10);
+
+        const handleDown = (e) => {
+          e.preventDefault();
+          audio.init();
+          isPointerDown = true;
+          triggerNoteOn(midi);
+        };
+
+        const handleUp = (e) => {
+          e.preventDefault();
+          triggerNoteOff(midi);
+        };
+
+        const handleEnter = (e) => {
+          if (isPointerDown) {
+            triggerNoteOn(midi);
+          }
+        };
+
+        const handleLeave = () => {
+          if (state.activeHeldMidis.has(midi)) {
+            triggerNoteOff(midi);
+          }
+        };
+
+        keyEl.addEventListener('pointerdown', handleDown);
+        keyEl.addEventListener('pointerup', handleUp);
+        keyEl.addEventListener('pointerenter', handleEnter);
+        keyEl.addEventListener('pointerleave', handleLeave);
+        keyEl.addEventListener('pointercancel', handleUp);
+      });
+    }
+
+    function triggerNoteOn(midi) {
+      if (state.activeHeldMidis.has(midi)) return;
+      state.activeHeldMidis.add(midi);
+      audio.noteOn(midi, 90);
+      updateKeyVisuals();
+      checkChordMatch();
+      updateHeldNotesDisplay();
+    }
+
+    function triggerNoteOff(midi) {
+      if (!state.activeHeldMidis.has(midi)) return;
+      state.activeHeldMidis.delete(midi);
+      audio.noteOff(midi);
+      updateKeyVisuals();
+      
+      if (state.isTransitioning) {
+        if (state.waitForMidiRelease && state.activeHeldMidis.size === 0) {
+          state.waitForMidiRelease = false;
+          closeSuccessModal();
+        }
+      } else {
+        checkChordMatch();
+      }
+      
+      updateHeldNotesDisplay();
+    }
+
+    function updateHeldNotesDisplay() {
+      const heldArr = Array.from(state.activeHeldMidis).sort((a,b) => a - b);
+      const textEl = document.getElementById('currentlyHeldNotesText');
+      if (heldArr.length === 0) {
+        textEl.textContent = 'None';
+        return;
+      }
+      textEl.textContent = heldArr.map(m => {
+        return formatNoteNameWithOctave(m, state.activeKeySignature);
+      }).join(' • ');
+    }
+
+    // --- Dynamic Music Theory Formatting Helpers ---
+    function formatNoteName(midi, keySig) {
+      const pc = midi % 12;
+      const spell = keySig < 0 ? SPELL_F[pc] : SPELL_S[pc];
+      const acc = spell.a === 1 ? '♯' : spell.a === -1 ? '♭' : '';
+      return `${DIATONIC_NAMES[spell.d]}${acc}`;
+    }
+
+    function formatNoteNameWithOctave(midi, keySig) {
+      const oct = Math.floor(midi / 12) - 1;
+      return `${formatNoteName(midi, keySig)}${oct}`;
+    }
+
+    function determineKeySignature(pitchClasses) {
+      if (state.keySignatureMode !== 'auto') return parseInt(state.keySignatureMode, 10);
+      let bestKey = 0;
+      let maxScore = -1;
+      let minAccidentals = 99;
+      
+      // Test all keys from 5 Flats (-5) to 5 Sharps (5)
+      for (let k = -5; k <= 5; k++) {
+        const rootPC = (k * 7 + 60) % 12; // Circle of fifths root pitch class
+        const scale = [0, 2, 4, 5, 7, 9, 11].map(interval => (rootPC + interval) % 12);
+        
+        let score = 0;
+        pitchClasses.forEach(pc => { if (scale.includes(pc)) score++; });
+        const numAccidentals = Math.abs(k);
+        
+        if (score > maxScore || (score === maxScore && numAccidentals < minAccidentals)) {
+          maxScore = score;
+          minAccidentals = numAccidentals;
+          bestKey = k;
+        }
+      }
+      return bestKey;
+    }
+
+    function updateKeyVisuals() {
+      const targetMidis = state.targetChord ? state.targetChord.midis : [];
+
+      pianoBoardEl.querySelectorAll('.white-key, .black-key').forEach(el => {
+        const midi = parseInt(el.dataset.midi, 10);
+        const pitchClass = midi % 12;
+        
+        // Match condition based on mode
+        let isTarget = false;
+        if (state.targetChord) {
+          if (state.octaveMatchMode === 'any') {
+            isTarget = state.targetChord.pitchClasses.includes(pitchClass);
+          } else {
+            isTarget = targetMidis.includes(midi);
+          }
+        }
+
+        const isPressed = state.activeHeldMidis.has(midi);
+        const dot = el.querySelector('.key-indicator');
+
+        // Reset classes
+        el.classList.remove('active-pressed', 'active-correct', 'active-target');
+
+        if (isPressed) {
+          if (isTarget) {
+            el.classList.add('active-correct');
+          } else {
+            el.classList.add('active-pressed');
+          }
+        }
+
+        // Key hint guide dots or solution reveal
+        if (dot) {
+          if (isTarget && (state.hints.keyGuide || state.showSolution)) {
+            dot.classList.remove('hidden');
+            dot.classList.add('bg-amber-400', 'ring-2', 'ring-amber-500/50', 'animate-pulse');
+          } else {
+            dot.classList.add('hidden');
+            dot.classList.remove('bg-amber-400', 'ring-2', 'ring-amber-500/50', 'animate-pulse');
+          }
+        }
+      });
+    }
+
+    /* ==========================================================
+       SVG Grand Staff Sheet Music Renderer (C3 to C5)
+       ========================================================== */
+    function renderSheetMusic(chord) {
+      const svg = document.getElementById('musicStaffSvg');
+      if (!chord) {
+        svg.innerHTML = '';
+        return;
+      }
+
+      // Base coordinates for the Grand Staff
+      const c4TrebleY = 90; // Middle C on Treble Clef
+      const c4BassY = 160;  // Middle C on Bass Clef (Expanded to match full height)
+      const c4Index = 28;   // Diatonic index for C4 (4th octave * 7 + 0)
+
+      // 1. Draw static Grand Staff (Lines, Clefs, Brace)
+      let svgContent = `
+        <defs>
+          <!-- Authentic Calligraphic Grand Staff Curly Brace -->
+          <path id="brace" d="M 23 40 C 13 40 10 50 10 115 C 10 120 5 125 0 125 C 5 125 10 130 10 135 C 10 200 13 210 23 210 C 18 210 14 200 14 135 C 14 130 10 125 5 125 C 10 125 14 120 14 115 C 14 50 18 40 23 40 Z" fill="#000" stroke="none"/>
+
+          <!-- Pristine SMuFL Treble Clef -->
+          <g id="trebleClefSym">
+             <path transform="scale(0.04, -0.04)" d="M441 -245c-23 -4 -48 -6 -76 -6c-59 0 -102 7 -130 20c-88 42 -150 93 -187 154c-26 44 -43 103 -48 176c-4 60 11 123 44 189c29 57 65 106 110 148s96 85 153 127c-3 16 -8 46 -13 92c-4 43 -5 73 -5 89c0 117 16 172 69 257c34 54 64 82 89 82c21 0 43 -30 69 -92s39 -115 41 -159c2 -120 -19 -173 -67 -256c-13 -20 -63 -90 -98 -118c-13 -9 -25 -19 -37 -29l31 -181c8 1 18 2 28 2c58 0 102 -12 133 -35c59 -43 92 -104 98 -184c11 -135 -80 -229 -180 -270c8 -57 17 -110 25 -162c5 -31 6 -58 6 -80c0 -30 -5 -53 -14 -70c-35 -64 -88 -99 -158 -103c-42 -3 -83 6 -124 26c-50 24 -77 59 -80 105c-2 34 5 63 20 87c18 28 45 42 79 44c51 4 99 -40 103 -87c4 -56 -30 -94 -105 -115c17 -24 51 -36 102 -36c62 0 116 43 140 85c9 16 13 41 13 74c0 20 -1 42 -5 67c-8 53 -18 106 -26 159zM461 939c-95 0 -135 -175 -135 -286c0 -24 2 -48 5 -71c50 39 92 82 127 128c43 57 63 106 60 148c-4 54 -23 82 -57 81zM406 119l54 -326c80 27 116 88 109 184c-7 99 -62 146 -163 142zM382 117c-74 -2 -132 -50 -128 -127c2 -46 43 -99 75 -115c-3 -2 -7 -5 -10 -10c-70 33 -116 88 -123 172c-5 73 42 135 88 170c23 17 49 29 78 36l-29 170c-21 -13 -52 -37 -92 -73c-50 -44 -86 -84 -109 -119c-49 -75 -71 -140 -67 -195c5 -68 35 -127 93 -176s125 -73 203 -73c25 0 50 3 75 9c-19 111 -36 221 -54 331z" fill="#000" />
+          </g>
+
+          <!-- User Provided Bass Clef -->
+          <g id="bassClefSym">
+             <path transform="scale(0.04, -0.04)" d="M567 -386c0,29,23,52,52,52s52,-23,52,-52s-23,-52,-52,-52s-52,23,-52,52zm0,250c0,29,23,52,52,52s52,-23,52,-52s-23,-52,-52,-52s-52,23,-52,52zm-323,136c171,0,292,-86,292,-248c0,-263,-264,-415,-517,-521c-2,-2,-5,-3,-8,-3c-6,0,-11,5,-11,11c0,3,1,6,3,8c203,118,415,265,415,494c0,121,-64,237,-174,237c-79,0,-138,-57,-164,-133c14,8,28,13,43,13c55,0,100,-45,100,-100c0,-58,-44,-107,-100,-107c-60,0,-112,48,-112,107c0,132,103,242,233,242z" fill="#000" />
+          </g>
+
+          <!-- Standard Clean Sharp Symbol -->
+          <g id="sharpSym">
+            <path transform="scale(0.04, -0.04)" d="m 216,-312 c 0,-10 -8,-19 -18,-19 -10,0 -19,9 -19,19 v 145 l -83,-31 v -158 c 0,-10 -9,-19 -19,-19 -10,0 -18,9 -18,19 v 145 l -32,-12 c -2,-1 -5,-1 -7,-1 -11,0 -20,9 -20,20 v 60 c 0,8 5,16 13,19 l 46,16 V 51 L 27,40 C 25,39 22,39 20,39 9,39 0,48 0,59 v 60 c 0,8 5,15 13,18 l 46,17 v 158 c 0,10 8,19 18,19 10,0 19,-9 19,-19 V 167 l 83,31 v 158 c 0,10 9,19 19,19 10,0 18,-9 18,-19 V 211 l 32,12 c 2,1 5,1 7,1 11,0 20,-9 20,-20 v -60 c 0,-8 -5,-16 -13,-19 L 216,109 V -51 l 32,11 c 2,1 5,1 7,1 11,0 20,-9 20,-20 v -60 c 0,-8 -5,-15 -13,-18 l -46,-17 V -312 z M 96,65 V -95 l 83,30 V 95 z" fill="#000" />
+          </g>
+
+          <!-- Standard Clean Flat Symbol -->
+          <g id="flatSym">
+            <path transform="scale(0.04, -0.04)" d="m 27,41 -1,-66 v -11 c 0,-22 1,-44 4,-66 45,38 93,80 93,139 0,33 -14,67 -43,67 C 49,104 28,74 27,41 z m -42,-179 -12,595 c 8,5 18,8 27,8 9,0 19,-3 27,-8 L 20,112 c 25,21 58,34 91,34 52,0 89,-48 89,-102 0,-80 -86,-117 -147,-169 -15,-13 -24,-38 -45,-38 -13,0 -23,11 -23,25 z" fill="#000" />
+          </g>
+
+          <!-- Standard Clean Natural Symbol -->
+          <g id="naturalSym">
+            <path transform="scale(0.04, -0.04)" d="m -8,375 c 8,4 17,7 26,7 9,0 17,-3 25,-7 l -3,-183 106,20 h 3 c 10,0 18,-7 18,-17 l 7,-570 c -8,-4 -16,-7 -25,-7 -9,0 -17,3 -25,7 l 3,183 -106,-20 h -3 c -10,0 -18,7 -18,17 z M 131,112 39,95 l -3,-207 92,17 z" fill="#000" />
+          </g>
+        </defs>
+
+        <!-- 5 Horizontal Lines for Treble & Bass -->
+        <g stroke="#000" stroke-width="1.2">
+          <!-- Treble Staff (E4 to F5) -->
+          <line x1="20" y1="40" x2="340" y2="40" />
+          <line x1="20" y1="50" x2="340" y2="50" />
+          <line x1="20" y1="60" x2="340" y2="60" />
+          <line x1="20" y1="70" x2="340" y2="70" />
+          <line x1="20" y1="80" x2="340" y2="80" />
+          
+          <!-- Bass Staff (G2 to A3) -->
+          <line x1="20" y1="170" x2="340" y2="170" />
+          <line x1="20" y1="180" x2="340" y2="180" />
+          <line x1="20" y1="190" x2="340" y2="190" />
+          <line x1="20" y1="200" x2="340" y2="200" />
+          <line x1="20" y1="210" x2="340" y2="210" />
+          
+          <!-- Vertical end measure bars -->
+          <line x1="20" y1="40" x2="20" y2="210" stroke-width="1.5" />
+          <line x1="334" y1="40" x2="334" y2="210" stroke-width="1.5" />
+          <line x1="340" y1="40" x2="340" y2="210" stroke-width="4" />
+        </g>
+
+        <!-- Render Clefs and Braces -->
+        <use href="#brace" />
+        <use href="#trebleClefSym" x="28" y="70" />
+        <use href="#bassClefSym" x="28" y="170" />
+      `;
+
+      // 2. Draw Active Key Signature
+      const keySig = state.activeKeySignature;
+      const ksXBase = 75; // Increased spacing for Key Signature
+      let ksSvg = '';
+      
+      // Standard diatonic offsets for Sharp/Flat key signature symbols
+      const sharpOffsetsT = [38, 35, 39, 36, 33]; // F5, C5, G5, D5, A4
+      const sharpOffsetsB = [24, 21, 25, 22, 19]; // F3, C3, G3, D3, A2
+      const flatOffsetsT = [34, 37, 33, 36, 32]; // B4, E5, A4, D5, G4
+      const flatOffsetsB = [20, 23, 19, 22, 18]; // B2, E3, A2, D3, G2
+
+      if (keySig > 0) {
+        for (let i = 0; i < keySig; i++) {
+          const x = ksXBase + i * 11;
+          const ty = c4TrebleY - (sharpOffsetsT[i] - c4Index) * 5;
+          const by = c4BassY - (sharpOffsetsB[i] - c4Index) * 5;
+          ksSvg += `<use href="#sharpSym" x="${x - 4}" y="${ty}" />`;
+          ksSvg += `<use href="#sharpSym" x="${x - 4}" y="${by}" />`;
+        }
+      } else if (keySig < 0) {
+        const absK = Math.abs(keySig);
+        for (let i = 0; i < absK; i++) {
+          const x = ksXBase + i * 11;
+          const ty = c4TrebleY - (flatOffsetsT[i] - c4Index) * 5;
+          const by = c4BassY - (flatOffsetsB[i] - c4Index) * 5;
+          ksSvg += `<use href="#flatSym" x="${x}" y="${ty}" />`;
+          ksSvg += `<use href="#flatSym" x="${x}" y="${by}" />`;
+        }
+      }
+      svgContent += ksSvg;
+
+      // 3. Draw Dynamic Notes of the chord
+      const sortedMidis = [...chord.midis].sort((a, b) => a - b);
+      
+      // Increased base X offset to provide a wide, comfortable space between key signature and notes
+      const noteXBase = 150 + (Math.abs(keySig) * 16); 
+      
+      const spellingMap = keySig < 0 ? SPELL_F : SPELL_S;
+      
+      // Determine which scale degrees have accidentals in the key signature
+      const keySigActiveDiatonics = {};
+      if (keySig > 0) {
+        const sharpOrders = [3, 0, 4, 1, 5]; // F, C, G, D, A
+        for (let i=0; i<keySig; i++) keySigActiveDiatonics[sharpOrders[i]] = 1; // 1 = sharp
+      } else if (keySig < 0) {
+        const flatOrders = [6, 2, 5, 1, 4]; // B, E, A, D, G
+        for (let i=0; i<Math.abs(keySig); i++) keySigActiveDiatonics[flatOrders[i]] = -1; // -1 = flat
+      }
+
+      // Track drawn notes to prevent accidental overlap
+      let lastDIndex = -99;
+      let accidentalCount = 0;
+
+      sortedMidis.forEach((midi, idx) => {
+        const pc = midi % 12;
+        const oct = Math.floor(midi / 12) - 1;
+        const spell = spellingMap[pc];
+        
+        // Absolute diatonic index
+        const dIndex = oct * 7 + spell.d;
+        const isTreble = dIndex >= 28; // Middle C and up goes to Treble
+        
+        let y = isTreble ? c4TrebleY - (dIndex - c4Index) * 5 : c4BassY - (dIndex - c4Index) * 5;
+
+        // Collision logic (stagger noteheads)
+        let xOffset = 0;
+        if (dIndex - lastDIndex === 1) {
+          xOffset = 16;
+        }
+        const noteX = noteXBase + xOffset;
+        lastDIndex = dIndex;
+
+        // Ledger lines logic
+        let ledgers = '';
+        if (isTreble) {
+          if (y <= 30) ledgers += `<line x1="${noteX - 12}" y1="30" x2="${noteX + 12}" y2="30" stroke="#000" stroke-width="1.5" />`;
+          if (y >= 90) ledgers += `<line x1="${noteX - 12}" y1="90" x2="${noteX + 12}" y2="90" stroke="#000" stroke-width="1.5" />`;
+          if (y >= 100) ledgers += `<line x1="${noteX - 12}" y1="100" x2="${noteX + 12}" y2="100" stroke="#000" stroke-width="1.5" />`;
+        } else {
+          if (y <= 160) ledgers += `<line x1="${noteX - 12}" y1="160" x2="${noteX + 12}" y2="160" stroke="#000" stroke-width="1.5" />`;
+          if (y >= 220) ledgers += `<line x1="${noteX - 12}" y1="220" x2="${noteX + 12}" y2="220" stroke="#000" stroke-width="1.5" />`;
+        }
+        svgContent += ledgers;
+
+        // Determine if Note needs a visual Accidental due to Key Signature contradiction
+        const ksAccidental = keySigActiveDiatonics[spell.d] || 0;
+        let needsAccidental = (spell.a !== ksAccidental);
+
+        if (needsAccidental) {
+          accidentalCount++;
+          // Stagger multiple accidentals in tight chords to avoid overlapping
+          const accShift = 17 + ((accidentalCount % 2 === 0 && xOffset === 0) ? 14 : 0);
+          
+          if (spell.a === 1) {
+             svgContent += `<use href="#sharpSym" x="${noteX - accShift - 4}" y="${y}" />`;
+          } else if (spell.a === -1) {
+             svgContent += `<use href="#flatSym" x="${noteX - accShift}" y="${y}" />`;
+          } else if (spell.a === 0) {
+             svgContent += `<use href="#naturalSym" x="${noteX - accShift - 2}" y="${y}" />`;
+          }
+        }
+
+        // Note Head
+        svgContent += `
+          <g transform="translate(${noteX}, ${y})">
+            <ellipse rx="7.5" ry="5.5" transform="rotate(-20)" fill="#000" />
+          </g>
+        `;
+      });
+
+      svg.innerHTML = svgContent;
+    }
+
+    /* ==========================================================
+       Chord Pool Generation strictly bounded within C3 (48) - C5 (72)
+       ========================================================== */
+    function rebuildAvailableChords() {
+      const activeCats = Object.keys(CHORD_CATEGORIES).filter(c => CHORD_CATEGORIES[c].active);
+      const chordPool = [];
+
+      const activeTypes = CHORD_TYPES.filter(t => activeCats.includes(t.category));
+
+      // Root notes strictly within C3 (48) up to 72 - maxInterval
+      activeTypes.forEach(chordType => {
+        const maxInterval = Math.max(...chordType.intervals);
+        const maxRoot = 72 - maxInterval;
+        
+        for (let rootMidi = 48; rootMidi <= maxRoot; rootMidi++) {
+          const midis = chordType.intervals.map(inter => rootMidi + inter);
+          const pitchClasses = midis.map(m => m % 12);
+          
+          chordPool.push({
+            chordType: chordType,
+            rootMidi: rootMidi,
+            category: chordType.category,
+            categoryLabel: CHORD_CATEGORIES[chordType.category].label,
+            midis,
+            pitchClasses
+          });
+        }
+      });
+
+      state.availableChords = chordPool;
+    }
+
+    function nextChord() {
+      state.isTransitioning = false;
+      if (state.availableChords.length === 0) {
+        showToast('Please enable at least one chord category!', 'alert-triangle');
+        return;
+      }
+
+      state.showSolution = false;
+      const randIndex = Math.floor(Math.random() * state.availableChords.length);
+      state.targetChord = state.availableChords[randIndex];
+
+      // Determine Key Signature & Name Spelling dynamically
+      state.activeKeySignature = determineKeySignature(state.targetChord.pitchClasses);
+      const rootNameText = formatNoteName(state.targetChord.rootMidi, state.activeKeySignature);
+      const rootNameWithOctave = formatNoteNameWithOctave(state.targetChord.rootMidi, state.activeKeySignature);
+      
+      state.targetChord.displayName = `${rootNameText}${state.targetChord.chordType.symbol}`;
+      state.targetChord.rootName = rootNameWithOctave;
+      state.targetChord.formula = state.targetChord.chordType.formula;
+
+      // Update UI elements
+      document.getElementById('chordNameText').textContent = state.targetChord.displayName;
+      document.getElementById('chordFormulaText').textContent = `Root: ${state.targetChord.rootName} • ${state.targetChord.formula}`;
+      document.getElementById('chordCategoryBadge').textContent = state.targetChord.categoryLabel;
+
+      renderSheetMusic(state.targetChord);
+      updateKeyVisuals();
+      applyHintVisibility();
+
+      // Audio Hint auto-playback if enabled
+      if (state.hints.sound) {
+        setTimeout(() => {
+          audio.playChord(state.targetChord.midis);
+        }, 150);
+      }
+    }
+
+    function checkChordMatch() {
+      if (!state.targetChord || state.isTransitioning) return;
+
+      const heldMidis = Array.from(state.activeHeldMidis);
+      const statusEl = document.getElementById('matchStatusText');
+
+      if (heldMidis.length === 0) {
+        statusEl.innerHTML = `<span class="text-slate-400">Play notes together</span>`;
+        return;
+      }
+
+      let isMatch = false;
+      let isSubset = false;
+
+      if (state.octaveMatchMode === 'any') {
+        // Match pitch classes, accounting for multi-octave notes in chords (e.g. Power Chords 1-5-8)
+        const targetPCs = state.targetChord.pitchClasses;
+        const heldPCs = heldMidis.map(m => m % 12);
+        
+        // Count occurrences of each pitch class to ensure exact multiset matching
+        const countOccurrences = (arr) => arr.reduce((acc, val) => { 
+          acc[val] = (acc[val] || 0) + 1; 
+          return acc; 
+        }, {});
+        
+        const targetCount = countOccurrences(targetPCs);
+        const heldCount = countOccurrences(heldPCs);
+        
+        // User must hold AT LEAST the required number of each pitch class in the target chord
+        isSubset = Object.keys(targetCount).every(pc => (heldCount[pc] || 0) >= targetCount[pc]);
+        
+        // Match is true if they hold the exact required notes and no extras
+        isMatch = isSubset && (heldPCs.length === targetPCs.length);
+      } else {
+        // Strict: exact MIDI pitch matching in C3-C5
+        const targetMidis = state.targetChord.midis;
+        isSubset = targetMidis.every(m => state.activeHeldMidis.has(m));
+        isMatch = isSubset && (heldMidis.length === targetMidis.length);
+      }
+
+      if (isMatch) {
+        state.isTransitioning = true;
+        statusEl.innerHTML = `<span class="text-emerald-400 flex items-center gap-1"><i data-lucide="check-circle-2" class="w-4 h-4"></i> Perfect! Chord matched</span>`;
+        lucide.createIcons();
+
+        // Play magical success chime
+        audio.playSuccessChime();
+
+        // Celebration Confetti
+        if (typeof confetti === 'function') {
+          confetti({
+            particleCount: 45,
+            spread: 60,
+            origin: { y: 0.7 }
+          });
+        }
+
+        // Increment stats
+        state.score += 10 + (state.streak * 2);
+        state.streak += 1;
+        document.getElementById('scoreCount').textContent = state.score;
+        document.getElementById('streakCount').textContent = state.streak;
+
+        showToast(`Awesome! ${state.targetChord.displayName} completed!`, 'check-circle-2');
+
+        // Check if user is currently pressing MIDI hardware keys
+        const isMidiInput = activeMidiKeyMap.size > 0;
+        showSuccessModal(state.targetChord, heldMidis, isMidiInput);
+
+      } else if (isSubset && heldMidis.length > 0) {
+        statusEl.innerHTML = `<span class="text-amber-400">Target notes held, release extra keys!</span>`;
+      } else {
+        statusEl.innerHTML = `<span class="text-indigo-300">Listening... (${heldMidis.length} keys active)</span>`;
+      }
+    }
+
+    function showSuccessModal(chord, heldMidis, isMidiInput = false) {
+      const modal = document.getElementById('successModal');
+      const modalName = document.getElementById('modalChordName');
+      const modalSvg = document.getElementById('modalMusicSvg');
+      const modalKeys = document.getElementById('modalKeysContainer');
+      const modalContent = document.getElementById('successModalContent');
+
+      // Set chord name
+      modalName.textContent = chord.displayName;
+
+      // Copy SVG inner contents
+      const originalSvg = document.getElementById('musicStaffSvg');
+      modalSvg.innerHTML = originalSvg.innerHTML;
+
+      // Create Key blocks
+      modalKeys.innerHTML = '';
+      const sortedMidis = [...heldMidis].sort((a,b) => a - b);
+      sortedMidis.forEach(midi => {
+        let name = formatNoteNameWithOctave(midi, state.activeKeySignature);
+        const span = document.createElement('span');
+        span.className = 'px-3 py-1.5 bg-slate-800 border-b-[3px] border-slate-600 rounded-lg text-indigo-300 font-mono font-bold shadow-md text-sm';
+        span.textContent = name;
+        modalKeys.appendChild(span);
+      });
+
+      // Build mini visual piano
+      buildMiniPiano(document.getElementById('modalMiniPiano'), heldMidis);
+
+      // Show modal
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      
+      // Trigger animation
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          modal.classList.remove('opacity-0');
+          modal.classList.add('opacity-100');
+          modalContent.classList.remove('scale-95', 'translate-y-4');
+          modalContent.classList.add('scale-100', 'translate-y-0');
+        });
+      });
+
+      const statusText = modalContent.querySelector('p.text-emerald-400');
+      
+      if (isMidiInput) {
+        state.waitForMidiRelease = true;
+        if (statusText) statusText.textContent = "PERFECT! RELEASE KEYS TO CONTINUE";
+      } else {
+        state.waitForMidiRelease = false;
+        if (statusText) statusText.textContent = "PERFECT MATCH!";
+        
+        setTimeout(() => {
+          if (state.isTransitioning && !state.waitForMidiRelease) {
+            closeSuccessModal();
+          }
+        }, 3000);
+      }
+    }
+
+    function closeSuccessModal() {
+      const modal = document.getElementById('successModal');
+      const modalContent = document.getElementById('successModalContent');
+
+      modal.classList.remove('opacity-100');
+      modal.classList.add('opacity-0');
+      modalContent.classList.remove('scale-100', 'translate-y-0');
+      modalContent.classList.add('scale-95', 'translate-y-4');
+      
+      setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        nextChord();
+      }, 300); // Wait for transition
+    }
+    
+    function buildMiniPiano(container, heldMidis) {
+      container.innerHTML = '';
+      const whiteKeys = KEYS_DATA.filter(k => !k.isBlack);
+      const totalWhite = whiteKeys.length;
+      const heldSet = new Set(heldMidis);
+
+      // Create White Keys
+      whiteKeys.forEach((keyInfo) => {
+        const keyDiv = document.createElement('div');
+        keyDiv.className = 'white-key pointer-events-none !transition-none';
+        if (heldSet.has(keyInfo.midi)) {
+          keyDiv.classList.add('active-correct');
+        }
+        container.appendChild(keyDiv);
+      });
+
+      // Create Black Keys
+      const blackKeys = KEYS_DATA.filter(k => k.isBlack);
+      blackKeys.forEach(keyInfo => {
+        const prevWhiteIndex = whiteKeys.findIndex(wk => wk.midi === keyInfo.midi - 1);
+        if (prevWhiteIndex !== -1) {
+          const leftPercent = ((prevWhiteIndex + 1) / totalWhite) * 100;
+          const blackKeyDiv = document.createElement('div');
+          blackKeyDiv.className = 'black-key pointer-events-none !transition-none';
+          blackKeyDiv.style.left = `calc(${leftPercent}% - 2.4%)`;
+          if (heldSet.has(keyInfo.midi)) {
+            blackKeyDiv.classList.add('active-correct');
+          }
+          container.appendChild(blackKeyDiv);
+        }
+      });
+    }
+
+    function applyHintVisibility() {
+      // 1. Notation Hint
+      const notationWrapper = document.getElementById('notationHiddenCover');
+      if (state.hints.notation) {
+        notationWrapper.classList.add('hidden');
+      } else {
+        notationWrapper.classList.remove('hidden');
+      }
+
+      // 2. Name Hint
+      const nameContainer = document.getElementById('chordNameContainer');
+      const hiddenMessage = document.getElementById('chordNameHiddenMessage');
+      if (state.hints.name) {
+        nameContainer.classList.remove('hidden');
+        hiddenMessage.classList.add('hidden');
+      } else {
+        nameContainer.classList.add('hidden');
+        hiddenMessage.classList.remove('hidden');
+      }
+
+      // Key guide refresh
+      updateKeyVisuals();
+    }
+
+    /* ==========================================================
+       Web MIDI Setup & Robust Error Handling
+       ========================================================== */
+    const activeMidiKeyMap = new Map();
+
+    // Map incoming notes to keep the full 25-key span (48 to 72: C3 to C5)
+    function mapToBoardRange(midi) {
+      let mapped = midi;
+      while (mapped < 48) mapped += 12;
+      while (mapped > 72) mapped -= 12;
+      return mapped;
+    }
+
+    function setupWebMIDI() {
+      const statusDot = document.getElementById('midiStatusDot');
+      const statusText = document.getElementById('midiStatusText');
+      const deviceInfo = document.getElementById('midiDeviceInfo');
+
+      if (!navigator.requestMIDIAccess) {
+        statusDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
+        statusText.textContent = 'MIDI Unsupported';
+        deviceInfo.textContent = 'Web MIDI is not supported in this browser (use keys or touch)';
+        showToast('Web MIDI API is not available in this browser', 'alert-circle');
+        return;
+      }
+
+      statusText.textContent = 'Requesting...';
+
+      navigator.requestMIDIAccess({ sysex: false })
+        .then(midiAccess => {
+          statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+          statusText.textContent = 'MIDI Active';
+
+          function listInputs() {
+            const inputs = Array.from(midiAccess.inputs.values());
+            if (inputs.length > 0) {
+              const names = inputs.map(i => i.name).join(', ');
+              deviceInfo.textContent = `Connected: ${names}`;
+              statusText.textContent = `${inputs.length} MIDI Device`;
+              showToast(`MIDI Connected: ${names}`, 'check');
+            } else {
+              deviceInfo.textContent = 'MIDI allowed! Connect your USB keyboard to play';
+              statusText.textContent = 'Awaiting Keyboard';
+              statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
+            }
+
+            inputs.forEach(input => {
+              input.onmidimessage = handleMIDIMessage;
+            });
+          }
+
+          listInputs();
+          midiAccess.onstatechange = listInputs;
+        })
+        .catch(err => {
+          console.warn('MIDI Access request failure:', err);
+          statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+          statusText.textContent = 'MIDI Blocked';
+          
+          if (err.name === 'SecurityError') {
+            deviceInfo.textContent = 'MIDI blocked by iframe permissions policy. You can use computer keyboard or touch.';
+            showToast('MIDI is restricted inside this iframe. Use computer keyboard or open directly.', 'alert-triangle');
+          } else {
+            deviceInfo.textContent = 'MIDI permission was not granted. Click "Request MIDI" to re-prompt.';
+            showToast('MIDI permission denied. Click Request MIDI to retry.', 'alert-circle');
+          }
+        });
+    }
+
+    function handleMIDIMessage(event) {
+      const [status, rawNote, velocity] = event.data;
+      const command = status >> 4;
+
+      // Apply Hardware Octave Shift setting
+      const note = rawNote + state.midiOctaveShift;
+
+      // Update incoming MIDI Monitor badge
+      const noteName = NOTE_NAMES[rawNote % 12];
+      const oct = Math.floor(rawNote / 12) - 1;
+      const monitorEl = document.getElementById('midiLastInText');
+      if (monitorEl) {
+        monitorEl.textContent = `${noteName}${oct} (#${rawNote})`;
+      }
+
+      // Determine mapped note within the 25-key C3-C5 span (48..72)
+      let mappedKey;
+      if (state.octaveMatchMode === 'any') {
+        mappedKey = mapToBoardRange(note);
+      } else {
+        mappedKey = (note >= 48 && note <= 72) ? note : null;
+      }
+
+      // Note ON message (command 9 with velocity > 0)
+      if (command === 9 && velocity > 0) {
+        if (mappedKey !== null) {
+          activeMidiKeyMap.set(rawNote, mappedKey);
+          triggerNoteOn(mappedKey);
+        } else {
+          audio.noteOn(note, velocity); // Play sound even if outside visual range
+        }
+      }
+      // Note OFF message (command 8 or command 9 with velocity 0)
+      else if (command === 8 || (command === 9 && velocity === 0)) {
+        if (activeMidiKeyMap.has(rawNote)) {
+          const keyToRelease = activeMidiKeyMap.get(rawNote);
+          activeMidiKeyMap.delete(rawNote);
+          triggerNoteOff(keyToRelease);
+        } else if (mappedKey !== null) {
+          triggerNoteOff(mappedKey);
+        } else {
+          audio.noteOff(note);
+        }
+      }
+    }
+
+    /* ==========================================================
+       Computer Keyboard Support (Z-M for C3-B3, Q-I for C4-C5)
+       ========================================================== */
+    function setupComputerKeyboard() {
+      const activeKeys = new Set();
+
+      window.addEventListener('keydown', (e) => {
+        if (e.repeat || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        const midi = KEYBOARD_MAP[e.code];
+        if (midi && !activeKeys.has(e.code)) {
+          activeKeys.add(e.code);
+          audio.init();
+          triggerNoteOn(midi);
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        const midi = KEYBOARD_MAP[e.code];
+        if (midi && activeKeys.has(e.code)) {
+          activeKeys.delete(e.code);
+          triggerNoteOff(midi);
+        }
+      });
+    }
+
+    function buildCategoryUI() {
+      const container = document.getElementById('categoryPillContainer');
+      container.innerHTML = '';
+
+      Object.values(CHORD_CATEGORIES).forEach(cat => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.catId = cat.id;
+
+        const updateClasses = () => {
+          if (cat.active) {
+            btn.className = `text-xs px-3 py-1.5 rounded-xl font-bold transition border bg-indigo-600/30 text-indigo-200 border-indigo-500/50 shadow-sm`;
+          } else {
+            btn.className = `text-xs px-3 py-1.5 rounded-xl font-semibold transition border bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700`;
+          }
+        };
+
+        updateClasses();
+        btn.textContent = cat.label;
+
+        btn.addEventListener('click', () => {
+          const activeCount = Object.values(CHORD_CATEGORIES).filter(c => c.active).length;
+          if (cat.active && activeCount === 1) {
+            showToast('At least one chord category must remain active!', 'alert-circle');
+            return;
+          }
+          cat.active = !cat.active;
+          updateClasses();
+          rebuildAvailableChords();
+          nextChord();
+        });
+
+        container.appendChild(btn);
+      });
+    }
+
+    function setupEventListeners() {
+      // Hint switches
+      document.getElementById('hintNotationToggle').addEventListener('change', (e) => {
+        state.hints.notation = e.target.checked;
+        applyHintVisibility();
+      });
+
+      document.getElementById('hintNameToggle').addEventListener('change', (e) => {
+        state.hints.name = e.target.checked;
+        applyHintVisibility();
+      });
+
+      document.getElementById('hintSoundToggle').addEventListener('change', (e) => {
+        state.hints.sound = e.target.checked;
+      });
+
+      document.getElementById('hintKeyGuideToggle').addEventListener('change', (e) => {
+        state.hints.keyGuide = e.target.checked;
+        updateKeyVisuals();
+      });
+
+      // Octave Shift Selector
+      document.getElementById('midiOctaveShift').addEventListener('change', (e) => {
+        state.midiOctaveShift = parseInt(e.target.value, 10);
+        showToast(`MIDI hardware shift: ${e.target.value >= 0 ? '+' : ''}${e.target.value} semitones`, 'sliders');
+      });
+
+      // Matching Mode Selector (Any Octave vs Strict C3-C5)
+      document.getElementById('octaveMatchMode').addEventListener('change', (e) => {
+        state.octaveMatchMode = e.target.value;
+        updateKeyVisuals();
+        showToast(`Matching mode: ${e.target.value === 'any' ? 'Flexible (Any Octave)' : 'Strict C3–C5'}`, 'check');
+      });
+
+      // Key Signature Mode
+      document.getElementById('keySignatureMode').addEventListener('change', (e) => {
+        state.keySignatureMode = e.target.value;
+        if (state.targetChord) {
+          // Force a redraw with the new key signature
+          state.activeKeySignature = determineKeySignature(state.targetChord.pitchClasses);
+          const rootNameText = formatNoteName(state.targetChord.rootMidi, state.activeKeySignature);
+          state.targetChord.displayName = `${rootNameText}${state.targetChord.chordType.symbol}`;
+          state.targetChord.rootName = formatNoteNameWithOctave(state.targetChord.rootMidi, state.activeKeySignature);
+          
+          document.getElementById('chordNameText').textContent = state.targetChord.displayName;
+          document.getElementById('chordFormulaText').textContent = `Root: ${state.targetChord.rootName} • ${state.targetChord.formula}`;
+          renderSheetMusic(state.targetChord);
+          updateHeldNotesDisplay();
+        }
+        showToast('Key Signature Updated', 'music');
+      });
+
+      // Actions
+      document.getElementById('hearChordBtn').addEventListener('click', () => {
+        if (state.targetChord) {
+          audio.playChord(state.targetChord.midis);
+        }
+      });
+
+      document.getElementById('skipChordBtn').addEventListener('click', () => {
+        state.streak = 0;
+        document.getElementById('streakCount').textContent = '0';
+        showToast('Chord skipped', 'skip-forward');
+        nextChord();
+      });
+
+      document.getElementById('showSolutionBtn').addEventListener('click', () => {
+        state.showSolution = !state.showSolution;
+        updateKeyVisuals();
+        showToast(state.showSolution ? 'Target keys highlighted' : 'Highlights hidden', 'help-circle');
+      });
+
+      // Explicit user-gesture button for MIDI permission
+      document.getElementById('midiConnectBtn').addEventListener('click', () => {
+        audio.init();
+        setupWebMIDI();
+      });
+    }
+
+    function showToast(message, iconName = 'info') {
+      const toast = document.getElementById('toast');
+      const msg = document.getElementById('toastMsg');
+      const icon = document.getElementById('toastIcon');
+
+      msg.textContent = message;
+      icon.setAttribute('data-lucide', iconName);
+      lucide.createIcons();
+
+      toast.classList.remove('translate-y-12', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => {
+        toast.classList.add('translate-y-12', 'opacity-0');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 2600);
+    }
+
+    window.onload = function() {
+      lucide.createIcons();
+      buildPianoBoard();
+      buildCategoryUI();
+      setupEventListeners();
+      setupComputerKeyboard();
+      rebuildAvailableChords();
+      setupWebMIDI();
+      nextChord();
+    };
+  </script>
+</body>
+</html>
