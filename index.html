@@ -187,11 +187,12 @@
         <span>Install App</span>
       </button>
 
-      <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 shadow-sm">
-        <i data-lucide="flame" class="w-4 h-4 text-amber-400 animate-pulse"></i>
-        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Streak</span>
-        <span id="streakCount" class="font-mono font-bold text-amber-400 text-sm">0</span>
-      </div>
+      <!-- Instant Fullscreen Toggle Button (works on Android tablets immediately) -->
+      <button id="fullscreenToggleBtn" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition">
+        <i data-lucide="maximize" class="w-3.5 h-3.5 text-indigo-400"></i>
+        <span id="fullscreenBtnText">Full Screen</span>
+      </button>
+
       <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 shadow-sm">
         <i data-lucide="award" class="w-4 h-4 text-emerald-400"></i>
         <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Score</span>
@@ -1600,6 +1601,36 @@
     }
 
     function setupEventListeners() {
+      // Fullscreen API toggle for immediate edge-to-edge playback
+      const fullscreenBtn = document.getElementById('fullscreenToggleBtn');
+      const fullscreenBtnText = document.getElementById('fullscreenBtnText');
+      
+      if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', () => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().then(() => {
+              if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+              }
+              fullscreenBtnText.textContent = 'Exit Full';
+              showToast('Entered Fullscreen Mode', 'maximize');
+            }).catch(err => {
+              showToast('Fullscreen denied by browser', 'alert-triangle');
+            });
+          } else {
+            document.exitFullscreen().then(() => {
+              fullscreenBtnText.textContent = 'Full Screen';
+            }).catch(() => {});
+          }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+          if (!document.fullscreenElement) {
+            fullscreenBtnText.textContent = 'Full Screen';
+          }
+        });
+      }
+
       document.getElementById('hintNotationToggle').addEventListener('change', (e) => {
         state.hints.notation = e.target.checked;
         applyHintVisibility();
